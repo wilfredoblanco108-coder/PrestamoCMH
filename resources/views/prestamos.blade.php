@@ -261,7 +261,7 @@
             display: grid;
 
             grid-template-columns:
-                repeat(4, 1fr);
+                repeat(6, 1fr);
 
             gap: 15px;
 
@@ -518,6 +518,16 @@
 
 
         /* RESPONSIVE */
+
+        @media (max-width: 1100px) {
+
+            .summary-grid {
+
+                grid-template-columns:
+                    repeat(3, 1fr);
+            }
+        }
+
 
         @media (max-width: 850px) {
 
@@ -865,6 +875,8 @@
             <div class="summary-grid">
 
 
+                <!-- NUMERO DE PRESTAMO -->
+
                 <div class="summary-box">
 
                     <div class="summary-label">
@@ -877,6 +889,8 @@
 
                 </div>
 
+
+                <!-- TASA ANUAL -->
 
                 <div class="summary-box">
 
@@ -891,6 +905,8 @@
                 </div>
 
 
+                <!-- NUMERO DE CUOTAS -->
+
                 <div class="summary-box">
 
                     <div class="summary-label">
@@ -904,6 +920,8 @@
                 </div>
 
 
+                <!-- CUOTA -->
+
                 <div class="summary-box">
 
                     <div class="summary-label">
@@ -912,6 +930,36 @@
 
                     <div class="summary-value">
                         {{ number_format($cuota, 2) }}
+                    </div>
+
+                </div>
+
+
+                <!-- VALOR PRIMERA CUOTA -->
+
+                <div class="summary-box">
+
+                    <div class="summary-label">
+                        Valor Primera Cuota
+                    </div>
+
+                    <div class="summary-value">
+                        {{ number_format($valorPrimeraCuota, 2) }}
+                    </div>
+
+                </div>
+
+
+                <!-- SUMA INTERÉS -->
+
+                <div class="summary-box">
+
+                    <div class="summary-label">
+                        Suma Interés Vencidos
+                    </div>
+
+                    <div class="summary-value">
+                        {{ number_format($sumaInteres, 2) }}
                     </div>
 
                 </div>
@@ -1042,6 +1090,7 @@
                     Script SQL Server
                 </h3>
 
+
                 <button
                     type="button"
                     class="btn-copy"
@@ -1072,15 +1121,19 @@
 
 function copiarSQL()
 {
+
     const textarea =
         document.getElementById('sqlScript');
 
+
     textarea.select();
+
 
     textarea.setSelectionRange(
         0,
         999999
     );
+
 
     navigator.clipboard.writeText(
         textarea.value
@@ -1089,11 +1142,14 @@ function copiarSQL()
         const boton =
             document.querySelector('.btn-copy');
 
+
         const textoOriginal =
             boton.innerText;
 
+
         boton.innerText =
             '¡Copiado!';
+
 
         setTimeout(function () {
 
@@ -1103,6 +1159,7 @@ function copiarSQL()
         }, 2000);
 
     });
+
 }
 
 </script>

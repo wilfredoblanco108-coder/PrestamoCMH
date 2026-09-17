@@ -43,9 +43,25 @@ class PrestamoController extends Controller
 
         $balanceInicial = (float) $datos['balance_inicial'];
 
+        $saldoCapital = (float) ($datos['saldo_capital'] ?? 0);
+
         $fechaInicio = Carbon::parse($datos['fecha_inicio']);
 
         $fechaFinal = Carbon::parse($datos['fecha_final']);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | VALOR PRIMERA CUOTA
+        |--------------------------------------------------------------------------
+        |
+        | Fórmula:
+        |
+        | Balance Inicial - Saldo Capital
+        |
+        */
+
+        $valorPrimeraCuota = $balanceInicial - $saldoCapital;
 
 
         /*
@@ -170,7 +186,6 @@ class PrestamoController extends Controller
             if (abs($nuevoSaldo) < 0.01) {
 
                 $nuevoSaldo = 0;
-
             }
 
 
@@ -221,6 +236,35 @@ class PrestamoController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | SUMA DE INTERÉS
+        |--------------------------------------------------------------------------
+        |
+        | Se suman los intereses (SalCod 51)
+        | desde la FECHA DE INICIO del préstamo
+        | hasta el 01/07/2026, ambas fechas incluidas.
+        |
+        */
+
+        $fechaCorteInteres = Carbon::create(2026, 7, 1);
+
+        $sumaInteres = collect($amortizacion)
+            ->filter(function ($fila) use ($fechaInicio, $fechaCorteInteres) {
+
+                $fechaPago = Carbon::createFromFormat(
+                    'd/m/Y',
+                    $fila['fecha']
+                );
+
+                return $fechaPago->greaterThanOrEqualTo($fechaInicio)
+                    && $fechaPago->lessThanOrEqualTo($fechaCorteInteres);
+            })
+            ->sum('interes');
+
+        $sumaInteres = round($sumaInteres, 2);
+
+
+        /*
+        |--------------------------------------------------------------------------
         | GENERAR SCRIPT SQL SERVER
         |--------------------------------------------------------------------------
         */
@@ -229,12 +273,30 @@ class PrestamoController extends Controller
         $sql .= "GO\n\n";
 
         $sql .= "UPDATE P\n";
+
         $sql .= "SET\n";
+
         $sql .= "    P.PlaPFecPago = V.FechaPago,\n";
-        $sql .= "    P.PlaPMonto   = V.Monto\n";
+
+        $sql .= "    P.PlaPMonto   = V.Monto,\n";
+
+        $sql .= "    P.PlaPVaPag   = CASE\n";
+
+        $sql .= "        WHEN V.Cuota = 1 AND V.SalCod = 50\n";
+
+        $sql .= "        THEN V.ValorPrimeraCuota\n";
+
+        $sql .= "        ELSE P.PlaPVaPag\n";
+
+        $sql .= "    END\n";
+
+
         $sql .= "FROM SIFCO.CrPlanPagos P\n";
+
         $sql .= "INNER JOIN\n";
+
         $sql .= "(\n";
+
         $sql .= "    VALUES\n";
 
 
@@ -264,6 +326,35 @@ class PrestamoController extends Controller
 
             /*
             |--------------------------------------------------------------------------
+            | VALOR PRIMERA CUOTA
+            |--------------------------------------------------------------------------
+            |
+            | Solo se coloca el valor calculado en:
+            |
+            | Cuota 1
+            | SalCod 50
+            |
+            | Las demás cuotas llevan 0.00
+            |
+            */
+
+            if ($numeroCuota == 1) {
+
+                $valorPrimeraCuotaSql = number_format(
+                    $valorPrimeraCuota,
+                    2,
+                    '.',
+                    ''
+                );
+
+            } else {
+
+                $valorPrimeraCuotaSql = '0.00';
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
             | SALCOD 50 - CAPITAL
             |--------------------------------------------------------------------------
             */
@@ -277,6 +368,8 @@ class PrestamoController extends Controller
                 . $fechaSql
                 . "',"
                 . $capital
+                . ","
+                . $valorPrimeraCuotaSql
                 . "),";
 
 
@@ -284,6 +377,11 @@ class PrestamoController extends Controller
             |--------------------------------------------------------------------------
             | SALCOD 51 - INTERÉS
             |--------------------------------------------------------------------------
+            |
+            | El interés continúa actualizándose en PlaPMonto.
+            |
+            | ValorPrimeraCuota = 0.00
+            |
             */
 
             $filasSql[] =
@@ -295,7 +393,7 @@ class PrestamoController extends Controller
                 . $fechaSql
                 . "',"
                 . $interes
-                . "),";
+                . ",0.00),";
         }
 
 
@@ -313,7 +411,8 @@ class PrestamoController extends Controller
 
 
         $sql .= "\n";
-        $sql .= ") V(PreNumero,Cuota,SalCod,FechaPago,Monto)\n";
+
+        $sql .= ") V(PreNumero,Cuota,SalCod,FechaPago,Monto,ValorPrimeraCuota)\n";
 
         $sql .= "    ON P.PreNumero = V.PreNumero\n";
 
@@ -326,7 +425,7 @@ class PrestamoController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | DEVOLVER VISTA
+        | MOSTRAR RESULTADO
         |--------------------------------------------------------------------------
         */
 
@@ -344,7 +443,11 @@ class PrestamoController extends Controller
 
             'balanceInicial' => $balanceInicial,
 
-            'saldoCapital' => $datos['saldo_capital'] ?? 0,
+            'saldoCapital' => $saldoCapital,
+
+            'valorPrimeraCuota' => round($valorPrimeraCuota, 2),
+
+            'sumaInteres' => $sumaInteres,
 
             'interesOrd' => $datos['interes_ordinario'] ?? 0,
 
