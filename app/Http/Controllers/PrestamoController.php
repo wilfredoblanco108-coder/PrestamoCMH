@@ -333,12 +333,53 @@ class PrestamoController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $sql = "USE SIFCO_SSU;\n";
-        $sql .= "GO\n\n";
+       /*
+|--------------------------------------------------------------------------
+| SQL PRINCIPAL
+|--------------------------------------------------------------------------
+| Primero se reinician los valores pagados del préstamo.
+| Luego se aplican los nuevos valores de amortización.
+|--------------------------------------------------------------------------
+*/
 
-        $sql .= "UPDATE P\n";
+$sql = "USE SIFCO_SSU;\n";
+$sql .= "GO\n\n";
 
-        $sql .= "SET\n";
+/*
+|--------------------------------------------------------------------------
+| REINICIAR PlaPVaPag
+|--------------------------------------------------------------------------
+*/
+
+$sql .= "UPDATE SIFCO.CrPlanPagos\n";
+$sql .= "SET\n";
+$sql .= "    PlaPVaPag = 0\n";
+$sql .= "WHERE PreNumero = '"
+    . $numeroPrestamo
+    . "';\n";
+$sql .= "GO\n\n";
+
+/*
+|--------------------------------------------------------------------------
+| ACTUALIZAR PLAN DE PAGOS
+|--------------------------------------------------------------------------
+*/
+
+$sql .= "UPDATE P\n";
+$sql .= "SET\n";
+$sql .= "    P.PlaPFecPago = V.FechaPago,\n";
+$sql .= "    P.PlaPMonto   = V.Monto,\n";
+$sql .= "    P.PlaPVaPag   = CASE\n";
+$sql .= "        WHEN V.Cuota = 1 AND V.SalCod = 50\n";
+$sql .= "        THEN V.ValorPrimeraCuota\n";
+$sql .= "        WHEN V.SalCod = 51\n";
+$sql .= "        THEN V.ValorPrimeraCuota\n";
+$sql .= "        ELSE P.PlaPVaPag\n";
+$sql .= "    END\n";
+$sql .= "FROM SIFCO.CrPlanPagos P\n";
+$sql .= "INNER JOIN\n";
+$sql .= "(\n";
+$sql .= "    VALUES\n";
 
         $sql .= "    P.PlaPFecPago = V.FechaPago,\n";
 
