@@ -258,48 +258,66 @@
 
         .summary-grid {
 
-            display: grid;
+    display: grid;
 
-            grid-template-columns:
-                repeat(6, 1fr);
+    grid-template-columns:
+        repeat(7, minmax(0, 1fr));
 
-            gap: 15px;
+    gap: 15px;
 
-            margin-bottom: 25px;
-        }
+    margin-bottom: 25px;
 
-
-        .summary-box {
-
-            background: #0f172a;
-
-            border:
-                1px solid #263244;
-
-            border-radius: 10px;
-
-            padding: 18px;
-        }
+    width: 100%;
+}
 
 
-        .summary-label {
+       .summary-box {
 
-            color: #9ca3af;
+    background: #0f172a;
 
-            font-size: 13px;
+    border:
+        1px solid #263244;
 
-            margin-bottom: 7px;
-        }
+    border-radius: 10px;
+
+    padding: 14px;
+
+    min-width: 0;
+
+    overflow: hidden;
+}
 
 
-        .summary-value {
+      .summary-label {
 
-            color: #f9fafb;
+    color: #9ca3af;
 
-            font-size: 20px;
+    font-size: 12px;
 
-            font-weight: bold;
-        }
+    margin-bottom: 7px;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+}
+
+
+     .summary-value {
+
+    color: #f9fafb;
+
+    font-size: 18px;
+
+    font-weight: bold;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+}
 
 
         /* TABLA */
@@ -519,14 +537,14 @@
 
         /* RESPONSIVE */
 
-        @media (max-width: 1100px) {
+       @media (max-width: 1100px) {
 
-            .summary-grid {
+    .summary-grid {
 
-                grid-template-columns:
-                    repeat(3, 1fr);
-            }
-        }
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+    }
+}
 
 
         @media (max-width: 850px) {
@@ -950,22 +968,37 @@
                 </div>
 
 
-                <!-- SUMA INTERÉS -->
+              <!-- SUMA INTERÉS -->
 
-                <div class="summary-box">
+<div class="summary-box">
 
-                    <div class="summary-label">
-                        Suma Interés Vencidos
-                    </div>
+    <div class="summary-label">
+        Suma Interés Vencidos
+    </div>
 
-                    <div class="summary-value">
-                        {{ number_format($sumaInteres, 2) }}
-                    </div>
+    <div class="summary-value">
+        {{ number_format($sumaInteres, 2) }}
+    </div>
 
-                </div>
+</div>
 
 
-            </div>
+<!-- VALOR 82 -->
+
+<div class="summary-box">
+
+    <div class="summary-label">
+        Valor 82
+    </div>
+
+    <div class="summary-value">
+        {{ number_format($valor82, 2) }}
+    </div>
+
+</div>
+
+
+            </div> <!-- CIERRE summary-grid -->
 
 
             <!-- TABLA -->

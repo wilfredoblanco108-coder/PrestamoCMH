@@ -117,35 +117,30 @@ class PrestamoController extends Controller
         $saldo = $balanceInicial;
 
 
-        for ($i = 1; $i <= $numeroCuotas; $i++) {
+       for ($i = 1; $i <= $numeroCuotas; $i++) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | FECHA DE PAGO
-            |--------------------------------------------------------------------------
-            */
+    if ($i == 1) {
 
-            if ($i == 1) {
+        // La primera cuota conserva exactamente
+        // la fecha de inicio del préstamo.
+        $fechaPago = $fechaInicio->copy();
 
-                $fechaPago = $fechaInicio->copy();
+    } else {
 
-            } else {
+        // Las cuotas siguientes siempre se llevan
+        // al último día del mes correspondiente.
+        //
+        // Se usa startOfMonth() ANTES de addMonths()
+        // para evitar el problema de fechas como 31 de enero.
+        $fechaPago = $fechaInicio
+            ->copy()
+            ->startOfMonth()
+            ->addMonths($i - 1)
+            ->endOfMonth();
 
-                $fechaPago = $fechaInicio
-                    ->copy()
-                    ->addMonths($i - 1)
-                    ->endOfMonth();
-            }
+    }
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | INTERÉS
-            |--------------------------------------------------------------------------
-            */
-
-            $interes = $saldo * $tasaMensual;
-
+    $interes = $saldo * $tasaMensual;
 
             /*
             |--------------------------------------------------------------------------
@@ -262,6 +257,13 @@ class PrestamoController extends Controller
 
         $sumaInteres = round($sumaInteres, 2);
 
+
+
+// VALOR 82
+        $valor82 = round(
+    ($datos['interes_ordinario'] ?? 0) - $sumaInteres,
+    2
+);
 
         /*
         |--------------------------------------------------------------------------
@@ -448,6 +450,8 @@ class PrestamoController extends Controller
             'valorPrimeraCuota' => round($valorPrimeraCuota, 2),
 
             'sumaInteres' => $sumaInteres,
+
+            'valor82' => $valor82,
 
             'interesOrd' => $datos['interes_ordinario'] ?? 0,
 
