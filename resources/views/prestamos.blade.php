@@ -998,6 +998,20 @@
 </div>
 
 
+<!-- VALOR TOTAL 51 -->
+
+<div class="summary-box">
+
+    <div class="summary-label">
+        Valor Total 51
+    </div>
+
+    <div class="summary-value">
+        {{ number_format($valorTotal51, 2) }}
+    </div>
+
+</div>
+
             </div> <!-- CIERRE summary-grid -->
 
 

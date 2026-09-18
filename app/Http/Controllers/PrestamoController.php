@@ -259,11 +259,73 @@ class PrestamoController extends Controller
 
 
 
-// VALOR 82
-        $valor82 = round(
-    ($datos['interes_ordinario'] ?? 0) - $sumaInteres,
-    2
-);
+/*
+        |--------------------------------------------------------------------------
+        | VALOR 82
+        |--------------------------------------------------------------------------
+        |
+        | Si el Interés Ordinario ingresado es MAYOR que la
+        | Suma Interés Vencidos:
+        |
+        |     Valor 82 = Interés Ordinario - Suma Interés Vencidos
+        |
+        | Si es menor o igual:
+        |
+        |     Valor 82 = 0.00
+        |
+        | El SalCod 82 SIEMPRE se registra en la primera cuota
+        | y con la fecha de la primera cuota.
+        |
+        */
+
+        $interesOrdinarioIngresado = (float) (
+            $datos['interes_ordinario'] ?? 0
+        );
+
+        if ($interesOrdinarioIngresado > $sumaInteres) {
+
+            $valor82 = round(
+                $interesOrdinarioIngresado - $sumaInteres,
+                2
+            );
+
+        } else {
+
+            $valor82 = 0.00;
+        }
+
+        // Fecha de la primera cuota para SalCod 82
+        $fechaPrimeraCuota82 = $amortizacion[0]['fecha_sql'];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | VALOR TOTAL 51
+        |--------------------------------------------------------------------------
+        |
+        | Si el Interés Ordinario ingresado es MENOR que la
+        | Suma Interés Vencidos:
+        |
+        |     Valor Total 51 = Suma Interés Vencidos
+        |                        - Interés Ordinario
+        |
+        | Si es mayor o igual:
+        |
+        |     Valor Total 51 = 0.00
+        |
+        */
+
+        if ($interesOrdinarioIngresado < $sumaInteres) {
+
+            $valorTotal51 = round(
+                $sumaInteres - $interesOrdinarioIngresado,
+                2
+            );
+
+        } else {
+
+            $valorTotal51 = 0.00;
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -288,6 +350,10 @@ class PrestamoController extends Controller
 
         $sql .= "        THEN V.ValorPrimeraCuota\n";
 
+        $sql .= "        WHEN V.SalCod = 51\n";
+
+        $sql .= "        THEN V.ValorPrimeraCuota\n";
+
         $sql .= "        ELSE P.PlaPVaPag\n";
 
         $sql .= "    END\n";
@@ -303,6 +369,10 @@ class PrestamoController extends Controller
 
 
         $filasSql = [];
+
+        // Saldo restante del Valor Total 51 que se irá aplicando
+        // contra las cuotas SalCod 51 hasta el 01/07/2026.
+        $valorTotal51Restante = $valorTotal51;
 
 
         foreach ($amortizacion as $fila) {
@@ -324,6 +394,56 @@ class PrestamoController extends Controller
                 '.',
                 ''
             );
+
+            /*
+            |--------------------------------------------------------------------------
+            | VALOR TOTAL 51 APLICADO
+            |--------------------------------------------------------------------------
+            |
+            | El Valor Total 51 se va consumiendo contra los intereses
+            | SalCod 51, comenzando por la primera cuota y avanzando
+            | solamente hasta el 01/07/2026.
+            |
+            | El valor aplicado nunca puede ser mayor que:
+            |   1. El saldo restante del Valor Total 51
+            |   2. El interés de la cuota
+            |
+            */
+
+            $valor51AplicadoSql = '0.00';
+
+            $fechaPagoActual = Carbon::createFromFormat(
+                'Y-m-d',
+                $fechaSql
+            );
+
+            if (
+                $valorTotal51Restante > 0
+                && $fechaPagoActual->lessThanOrEqualTo($fechaCorteInteres)
+            ) {
+
+                $valor51Aplicado = min(
+                    $valorTotal51Restante,
+                    $fila['interes']
+                );
+
+                $valor51Aplicado = round(
+                    $valor51Aplicado,
+                    2
+                );
+
+                $valor51AplicadoSql = number_format(
+                    $valor51Aplicado,
+                    2,
+                    '.',
+                    ''
+                );
+
+                $valorTotal51Restante = round(
+                    $valorTotal51Restante - $valor51Aplicado,
+                    2
+                );
+            }
 
 
             /*
@@ -395,6 +515,42 @@ class PrestamoController extends Controller
                 . $fechaSql
                 . "',"
                 . $interes
+                . ","
+                . $valor51AplicadoSql
+                . "),";
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SALCOD 82 - VALOR 82
+        |--------------------------------------------------------------------------
+        |
+        | Se agrega una fila SalCod 82 solamente cuando
+        | el Valor 82 sea mayor que 0.00.
+        |
+        | Cuota = 1
+        | Fecha = fecha de la primera cuota
+        | Monto = Valor 82
+        |
+        */
+
+        if ($valor82 > 0) {
+
+            $valor82Sql = number_format(
+                $valor82,
+                2,
+                '.',
+                ''
+            );
+
+            $filasSql[] =
+                "    ('"
+                . $numeroPrestamo
+                . "',1,82,'"
+                . $fechaPrimeraCuota82
+                . "',"
+                . $valor82Sql
                 . ",0.00),";
         }
 
@@ -424,6 +580,64 @@ class PrestamoController extends Controller
 
         $sql .= "GO";
 
+         /*
+        |--------------------------------------------------------------------------
+        | ELIMINAR CUOTAS SOBRANTES
+        |--------------------------------------------------------------------------
+        |
+        | Se eliminan las cuotas que sean mayores al número de cuotas
+        | calculado por el proyecto.
+        |
+        */
+
+        $sql .= "\n\n";
+        $sql .= "USE SIFCO_SSU;\n";
+        $sql .= "GO\n\n";
+        $sql .= "DELETE FROM SIFCO.CrPlanPagos\n";
+        $sql .= "WHERE PreNumero = '"
+            . $numeroPrestamo
+            . "'\n";
+        $sql .= "  AND PlaPNuCuota > "
+            . $numeroCuotas
+            . ";\n";
+        $sql .= "GO";
+
+
+        /*
+|--------------------------------------------------------------------------
+| ACTUALIZAR ESTADO DE CUOTAS Y MORA
+|--------------------------------------------------------------------------
+*/
+
+$sql .= "\n\n";
+
+$sql .= "UPDATE SIFCO.CrPlanPagos\n";
+$sql .= "SET PlaPAtrasada = 'S'\n";
+$sql .= "WHERE PreNumero = '"
+    . $numeroPrestamo
+    . "' AND PlaPFecPago < '2026-07-30';\n";
+$sql .= "GO\n\n";
+
+$sql .= "UPDATE SIFCO.CrPlanPagos\n";
+$sql .= "SET PlaPAtrasada = 'N'\n";
+$sql .= "WHERE PreNumero = '"
+    . $numeroPrestamo
+    . "' AND PlaPFecPago > '2026-06-30';\n";
+$sql .= "GO\n\n";
+
+$sql .= "UPDATE SIFCO.CrPlanPagos\n";
+$sql .= "SET PlaPMoraMonto = 0, "
+    . "PlaPMoraValorPagado = 0, "
+    . "PlaPMoraDias = 0, "
+    . "PlaPMoraPagado = 0\n";
+$sql .= "WHERE PreNumero = '"
+    . $numeroPrestamo
+    . "';\n";
+$sql .= "GO";
+
+
+
+
 
         /*
         |--------------------------------------------------------------------------
@@ -452,6 +666,8 @@ class PrestamoController extends Controller
             'sumaInteres' => $sumaInteres,
 
             'valor82' => $valor82,
+
+            'valorTotal51' => $valorTotal51,
 
             'interesOrd' => $datos['interes_ordinario'] ?? 0,
 

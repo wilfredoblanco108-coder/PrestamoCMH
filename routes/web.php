@@ -16,3 +16,5 @@ Route::post('/prestamos/calcular', [
     PrestamoController::class,
     'calcular'
 ])->name('prestamos.calcular');
+
+
